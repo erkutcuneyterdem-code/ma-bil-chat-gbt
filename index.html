@@ -296,6 +296,27 @@
   .nesineAnaTablo th:nth-child(21),.nesineAnaTablo td:nth-child(21){min-width:125px}
   .radarMini{min-width:118px;white-space:normal!important;line-height:1.25}
   .radarStatBtn{min-width:88px}
+
+  /* RADAR Match Intelligence v4 */
+  .marketCell{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:72px}
+  .marketCell .odds{font-weight:800}
+  .marketCell .prob{font-size:.72rem;padding:2px 6px;border-radius:6px;font-weight:800;border:1px solid var(--line)}
+  .marketCell .prob.yesil{background:#e8f7ef;color:#117647;border-color:#a9ddc0}
+  .marketCell .prob.sari{background:#fff6d9;color:#9a6500;border-color:#efd17a}
+  .marketCell .prob.kirmizi{background:#fdeaea;color:#b72f2f;border-color:#e8aaaa}
+  .radarExpand{background:#f8fbff;border-top:1px solid var(--line);padding:12px}
+  .radarTabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .radarTabs button{border:1px solid var(--line);background:#edf5fe;color:var(--text);padding:7px 12px;border-radius:8px;font-weight:800;cursor:pointer}
+  .radarTabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .radarGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+  .radarCard{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px}
+  .radarCard h4{margin:0 0 7px;font-size:.9rem}
+  .radarScoreList{display:grid;gap:5px}
+  .radarScoreRow{display:grid;grid-template-columns:52px 1fr 42px;align-items:center;gap:6px}
+  .radarBar{height:7px;border-radius:99px;background:#e8eef5;overflow:hidden}
+  .radarBar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+  .factorPills{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+  .factorPill{font-size:.72rem;border:1px solid var(--line);border-radius:999px;padding:3px 7px;background:#f5f9fd}
 </style>
 </head>
 <body>
@@ -1640,8 +1661,100 @@ async function radarStatsToggle(c,ev,dep,lig,ulke,tarih){
       if(kd.sakatlar&&kd.sakatlar.length)h+='<div class="factor"><b>⚠️ Maç özel eksikler</b><br>'+kd.sakatlar.slice(0,8).map(x=>(x.takim||'')+' · '+(x.oyuncu||'')+(x.sebep?' ('+x.sebep+')':'')).join('<br>')+'</div>';
     }else h+='<div class="factor"><b>👥 Kadro / teknik direktör</b><br>Maç kadrosu henüz yok veya fikstür eşleşmedi.</div>';
     h+='</div><div class="lig" style="margin-top:7px">Yüzdeler olasılıksaldır. Veri bulunmayan faktör modele zorla eklenmez.</div>';
+    const m=macBul(c);
+    if(m)h=radarPanelHtml(c,ev,dep,lig,gv,kd,m);
     radarStatsCache[c]=h;el.innerHTML=h;
   }catch(e){el.innerHTML='<span class="wait">İstatistik verisi alınamadı: '+e.message+'</span>';}
+}
+
+
+function marketCell(oran,p,etiket,c,mac,pazar){
+  let od='—';
+  if(oran!=null){
+    if(oran===1)od='🔒';
+    else od=ob(c,mac,pazar,oran);
+  }
+  let prb='';
+  if(p!=null&&!isNaN(+p)){p=Math.round(+p);prb='<span class="prob '+aiRenk(p)+'">%'+p+'</span>';}
+  return '<div class="marketCell"><span class="odds">'+od+'</span>'+prb+'</div>';
+}
+function marketProb(m,key){
+  const r=radarHesap(m.c,m), a=m.ai||{}, g=bultenAi[m.c]||{};
+  if(key==='1')return r?r.p1:(a.p1??null);
+  if(key==='X')return r?r.pX:(a.pX??null);
+  if(key==='2')return r?r.p2:(a.p2??null);
+  if(key==='alt')return a.pUst25!=null?100-a.pUst25:(g.ust!=null?100-g.ust:null);
+  if(key==='ust')return a.pUst25!=null?a.pUst25:(g.ust??null);
+  if(key==='1X')return r?Math.min(99,r.p1+r.pX):null;
+  if(key==='12')return r?Math.min(99,r.p1+r.p2):null;
+  if(key==='X2')return r?Math.min(99,r.pX+r.p2):null;
+  if(key==='var')return a.pKG!=null?a.pKG:(g.kg??null);
+  if(key==='yok'){const p=a.pKG!=null?a.pKG:g.kg;return p!=null?100-p:null;}
+  if(key==='gol23')return radarPazarProb(m,'gol23');
+  if(key==='iy15')return radarPazarProb(m,'iy15');
+  if(key==='iykg')return radarPazarProb(m,'iykg');
+  return null;
+}
+function radarSkorDagilim(m){
+  const a=bultenAi[m.c], rows=[];
+  if(a&&a.durum==='ok'&&a.skor){
+    const r=skoruCoz(a.skor);
+    const base=(radarHesap(m.c,m)||{}).guven||55;
+    rows.push([a.skor,Math.max(9,Math.min(24,Math.round(base*.28)))]);
+    if(r){
+      const alts=[[r.mh,r.ma+1],[r.mh+1,r.ma],[Math.max(0,r.mh-1),r.ma],[r.mh,Math.max(0,r.ma-1)]];
+      let p=Math.max(6,Math.round(base*.20));
+      alts.forEach((x,i)=>rows.push([x[0]+'-'+x[1],Math.max(5,p-i*2)]));
+    }
+  }
+  return rows.slice(0,5);
+}
+function radarTab(c,tab){
+  const box=document.getElementById('rstat-'+c); if(!box)return;
+  box.querySelectorAll('[data-pane]').forEach(x=>x.style.display=x.dataset.pane===tab?'block':'none');
+  box.querySelectorAll('.radarTabs button').forEach(x=>x.classList.toggle('on',x.dataset.tab===tab));
+}
+function radarPanelHtml(c,ev,dep,lig,gv,kd,m){
+  const R=radarHesap(c,m), ai=bultenAi[c]||{}, scores=radarSkorDagilim(m);
+  const best=[];
+  const push=(ad,p)=>{if(p!=null)best.push({ad,p:Math.round(p)});};
+  push('MS '+(R?R.radarFav:''),R&&R.top); push('2.5 Üst',marketProb(m,'ust')); push('KG Var',marketProb(m,'var')); push('2-3 Gol',marketProb(m,'gol23')); push('İY 1.5 Üst',marketProb(m,'iy15')); push('İY KG Var',marketProb(m,'iykg'));
+  best.sort((a,b)=>b.p-a.p);
+  const evf=gv&&gv.ev?formPuan(gv.ev.form):null, dpf=gv&&gv.dep?formPuan(gv.dep.form):null;
+  const sakE=gv&&gv.ev&&gv.ev.sakatlik||[], sakD=gv&&gv.dep&&gv.dep.sakatlik||[];
+  const teams=kd&&kd.takimlar||[];
+  const summary='<div class="radarGrid">'+
+    '<div class="radarCard"><h4>🧠 AI Tahmin Özeti</h4><div style="font-size:1.6rem;font-weight:900;color:var(--accent)">'+(R?R.radarFav:'—')+' '+(R?'%'+Math.round(R.top):'')+'</div><div class="factorPills">'+
+      (evf!=null?'<span class="factorPill">Ev form %'+evf+'</span>':'')+
+      (dpf!=null?'<span class="factorPill">Dep form %'+dpf+'</span>':'')+
+      (sakE.length?'<span class="factorPill">Ev eksik '+sakE.length+'</span>':'')+
+      (sakD.length?'<span class="factorPill">Dep eksik '+sakD.length+'</span>':'')+
+    '</div></div>'+
+    '<div class="radarCard"><h4>🎯 En Güçlü Tahminler</h4>'+best.slice(0,5).map(x=>'<div style="display:flex;justify-content:space-between;padding:3px 0"><span>'+x.ad+'</span><b class="'+puanCls(x.p)+'">%'+x.p+'</b></div>').join('')+'</div>'+
+    '<div class="radarCard"><h4>🕐 İlk Yarı</h4><div>İY 1.5 Üst: <b>'+((marketProb(m,'iy15')!=null)?'%'+Math.round(marketProb(m,'iy15')):'—')+'</b></div><div>İY KG Var: <b>'+((marketProb(m,'iykg')!=null)?'%'+Math.round(marketProb(m,'iykg')):'—')+'</b></div><div>İY skor: <b>'+(ai.iyskor||'—')+'</b></div></div>'+
+    '<div class="radarCard"><h4>📊 Maç Skoru Dağılımı</h4><div class="radarScoreList">'+(scores.length?scores.map(x=>'<div class="radarScoreRow"><b>'+x[0]+'</b><span class="radarBar"><i style="width:'+Math.min(100,x[1]*4)+'%"></i></span><b>%'+x[1]+'</b></div>').join(''):'<span class="lig">AI skor analizi henüz yok.</span>')+'</div></div>'+
+  '</div>';
+  const stats='<div class="radarGrid">'+
+    '<div class="radarCard"><h4>📈 Son Maçlar / Form</h4>'+(gv&&gv.bulundu?'<b>'+ev+'</b>: '+(gv.ev.form||'—')+(evf!=null?' · %'+evf:'')+'<br><b>'+dep+'</b>: '+(gv.dep.form||'—')+(dpf!=null?' · %'+dpf:''):'Veri yok')+'</div>'+
+    '<div class="radarCard"><h4>🔁 H2H</h4>'+(gv&&gv.h2h&&gv.h2h.length?gv.h2h.slice(0,5).map(x=>x.mac).join('<br>'):'Veri yok')+'</div>'+
+    '<div class="radarCard"><h4>📊 Sıra / Puan</h4>'+(gv&&gv.bulundu?ev+': '+(gv.ev.siralama?gv.ev.siralama.sira+'. / '+(gv.ev.siralama.puan??'—')+'p':'—')+'<br>'+dep+': '+(gv.dep.siralama?gv.dep.siralama.sira+'. / '+(gv.dep.siralama.puan??'—')+'p':'—'):'Veri yok')+'</div>'+
+  '</div>';
+  const squads='<div class="radarGrid">'+
+    '<div class="radarCard"><h4>👥 Kadrolar</h4>'+(kd&&kd.bulundu?teams.map(x=>'<b>'+(x.takim||'')+'</b>: '+((x.ilk11||[]).length)+' ilk 11 · '+((x.yedekler||[]).length)+' yedek').join('<br>'):'Henüz kadro verisi yok.')+'</div>'+
+    '<div class="radarCard"><h4>🚑 Sakat / Cezalı</h4>'+(sakE.length||sakD.length?('<b>'+ev+'</b>: '+(sakE.join(', ')||'yok')+'<br><b>'+dep+'</b>: '+(sakD.join(', ')||'yok')):'Kayıtlı eksik yok / veri yok.')+'</div>'+
+    '<div class="radarCard"><h4>🧑‍🏫 Teknik Direktör</h4>'+(kd&&kd.bulundu?teams.map(x=>(x.takim||'')+': '+(x.teknikDirektor||'—')+(x.formasyon?' · '+x.formasyon:'')).join('<br>'):'Veri yok.')+'</div>'+
+  '</div>';
+  const notes='<div class="radarCard"><h4>📋 Maç Notları</h4><div>'+(ai.yorum||'AI analizini çalıştırınca maç yorumu burada görünür.')+'</div><div class="lig" style="margin-top:8px">Veri olmayan faktörler uydurulmaz; yüzde ve tahminler olasılıksaldır.</div></div>';
+  return '<div class="radarTabs">'+
+    '<button class="on" data-tab="ai" onclick="radarTab('+c+',\'ai\')">📊 AI Analiz</button>'+
+    '<button data-tab="stats" onclick="radarTab('+c+',\'stats\')">📈 İstatistikler</button>'+
+    '<button data-tab="squads" onclick="radarTab('+c+',\'squads\')">👥 Kadrolar</button>'+
+    '<button data-tab="notes" onclick="radarTab('+c+',\'notes\')">📋 Maç Notları</button>'+
+  '</div>'+
+  '<div data-pane="ai">'+summary+'</div>'+
+  '<div data-pane="stats" style="display:none">'+stats+'</div>'+
+  '<div data-pane="squads" style="display:none">'+squads+'</div>'+
+  '<div data-pane="notes" style="display:none">'+notes+'</div>';
 }
 
 function elitDegistir(){
@@ -1742,19 +1855,19 @@ function bulteniCizNesine(j){
           <tr>
             <td>${o_(m.t)}</td>
             <td><a href="javascript:void(0)" onclick="macSorgula('${(m.hn+' '+m.an).replace(/'/g,'’')}')" title="AI yorumu ve oranlar için tıkla" style="color:var(--text);text-decoration:none"><b>${m.hn} – ${m.an}</b> <span class="lig" style="display:inline">🤖</span></a></td>
-            <td>${oranVeyaAi(m.ms&&m.ms['1'],m,'1','MS 1')}</td>
-            <td>${oranVeyaAi(m.ms&&m.ms['X'],m,'X','MS X')}</td>
-            <td>${oranVeyaAi(m.ms&&m.ms['2'],m,'2','MS 2')}</td>
-            <td>${oranVeyaAi(m.au25&&m.au25.alt,m,'alt','2.5 Alt')}</td>
-            <td>${oranVeyaAi(m.au25&&m.au25.ust,m,'ust','2.5 Üst')}</td>
-            <td>${oranVeyaAi(m.cifteSans&&m.cifteSans['1X'],m,'1X','ÇŞ 1X')}</td>
-            <td>${oranVeyaAi(m.cifteSans&&m.cifteSans['12'],m,'12','ÇŞ 12')}</td>
-            <td>${oranVeyaAi(m.cifteSans&&m.cifteSans['X2'],m,'X2','ÇŞ X2')}</td>
-            <td>${oranVeyaAi(m.kg&&m.kg['var'],m,'var','KG Var')}</td>
-            <td>${oranVeyaAi(m.kg&&m.kg['yok'],m,'yok','KG Yok')}</td>
-            <td>${probBadge('2-3',radarPazarProb(m,'gol23'),'2-3 gol model olasılığı')}</td>
-            <td>${probBadge('İY Ü',radarPazarProb(m,'iy15'),'İlk yarı 1.5 üst model olasılığı')}</td>
-            <td>${probBadge('İY KG',radarPazarProb(m,'iykg'),'İlk yarı KG Var model olasılığı')}</td>
+            <td>${marketCell(m.ms&&m.ms['1'],marketProb(m,'1'),'MS 1',m.c,m.hn+' - '+m.an,'MS 1')}</td>
+            <td>${marketCell(m.ms&&m.ms['X'],marketProb(m,'X'),'MS X',m.c,m.hn+' - '+m.an,'MS X')}</td>
+            <td>${marketCell(m.ms&&m.ms['2'],marketProb(m,'2'),'MS 2',m.c,m.hn+' - '+m.an,'MS 2')}</td>
+            <td>${marketCell(m.au25&&m.au25.alt,marketProb(m,'alt'),'2.5 Alt',m.c,m.hn+' - '+m.an,'2.5 Alt')}</td>
+            <td>${marketCell(m.au25&&m.au25.ust,marketProb(m,'ust'),'2.5 Üst',m.c,m.hn+' - '+m.an,'2.5 Üst')}</td>
+            <td>${marketCell(m.cifteSans&&m.cifteSans['1X'],marketProb(m,'1X'),'ÇŞ 1X',m.c,m.hn+' - '+m.an,'ÇŞ 1X')}</td>
+            <td>${marketCell(m.cifteSans&&m.cifteSans['12'],marketProb(m,'12'),'ÇŞ 12',m.c,m.hn+' - '+m.an,'ÇŞ 12')}</td>
+            <td>${marketCell(m.cifteSans&&m.cifteSans['X2'],marketProb(m,'X2'),'ÇŞ X2',m.c,m.hn+' - '+m.an,'ÇŞ X2')}</td>
+            <td>${marketCell(m.kg&&m.kg['var'],marketProb(m,'var'),'KG Var',m.c,m.hn+' - '+m.an,'KG Var')}</td>
+            <td>${marketCell(m.kg&&m.kg['yok'],marketProb(m,'yok'),'KG Yok',m.c,m.hn+' - '+m.an,'KG Yok')}</td>
+            <td>${marketCell(m.golAralik&&m.golAralik.g23,marketProb(m,'gol23'),'2-3 Gol',m.c,m.hn+' - '+m.an,'2-3 Gol')}</td>
+            <td>${marketCell(m.iy15&&m.iy15.ust,marketProb(m,'iy15'),'İY 1.5 Üst',m.c,m.hn+' - '+m.an,'İY 1.5 Üst')}</td>
+            <td>${marketCell(m.iykg&&m.iykg['var'],marketProb(m,'iykg'),'İY KG Var',m.c,m.hn+' - '+m.an,'İY KG Var')}</td>
             <td>${(()=>{const p=iyPiyasaOlasilik(m);if(!p)return '<span class="lig">—</span>';const a=[['1',p.p1],['X',p.pX],['2',p.p2]].sort((x,y)=>y[1]-x[1])[0];return probBadge('İY '+a[0],a[1],'Nesine ilk yarı oranından marjsız olasılık');})()}</td>
             <td>${skorTahminHtml(m,l.lig)}</td>
             <td>${radarMiniHtml(m)}</td>
