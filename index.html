@@ -615,15 +615,11 @@
       <button class="btn" id="stGuncelleBtn" onclick="stTahminDoldur()">🔄 Tahminleri güncelle</button>
       <button class="btn" id="stGorunumBtn" onclick="stGorunumDegistir()" style="background:var(--panel2);color:var(--text);border:1px solid var(--line)">📊 Geniş tablo</button>
       <button class="btn" onclick="stTahminKaydet()" style="border:1px solid var(--green);color:var(--green);background:var(--panel2)">💾 Karneye kaydet</button>
-      <button class="btn" id="stSilBtn" onclick="stKayitSilAc()" style="border:1px solid var(--red);color:var(--red);background:var(--panel2)">🗑️ Kayıtlı kuponu sil</button>
-      <button class="btn" id="stKuponBtn" onclick="buHaftaKuponAc()" style="border:1px solid var(--gold,#e0a800);color:var(--gold,#e0a800);background:var(--panel2)">📌 Bu Haftanın Kuponu</button>
-      <button class="btn" id="kkBtn" onclick="kkAc()" style="border:1px solid var(--accent);color:var(--accent);background:var(--panel2)">🎟️ Kolon Kur</button>
+      <button class="btn" id="stSilBtn" onclick="stKayitSilAc()" style="border:1px solid var(--red);color:var(--red);background:var(--panel2)">🗑️ Kayıtlı kuponu sil</button>      <button class="btn" id="kkBtn" onclick="kkAc()" style="border:1px solid var(--accent);color:var(--accent);background:var(--panel2)">🎟️ Kolon Kur</button>
       <span class="stamp" id="stTahminDurum"></span>
     </div>
     <div id="kolonKurPanel"></div>
-    <div id="stSilPanel"></div>
-    <div id="stKuponPanel"></div>
-    <div id="gecenHaftaPanel"></div>
+    <div id="stSilPanel"></div>    <div id="gecenHaftaPanel"></div>
     <div id="stTahminPanel"></div>
     <div id="sportotoIcerik" class="kart">Spor Toto programı yükleniyor…</div>
   </div>
@@ -2567,7 +2563,7 @@ const BU_HAFTA_KUPON={hafta:'18-20 Eylül 2026 · nihai',tarih:'2026-09-18',mac:
  {no:15,ev:'Roma',dep:'Inter',bahis:'12',skor:'1-2',tuzak:0,not:'Avrupa 36/27/37, beraberlik en düşük; Inter’de Çalhanoğlu, Stones yok'}
 ]};
 let stKuponAcik=false;
-function buHaftaKuponAc(){stKuponAcik=!stKuponAcik;buHaftaKuponCiz();}
+function buHaftaKuponAc(){return;}
 // ================= 🎟️ Kolon Kur (etkileşimli kupon + bütçe/kolon hesabı) =================
 const KK_M=[
  ["18 Eyl 20:00", "Kasımpaşa", "Konyaspor", "42/34/24", "1X", "Kasımpaşa Konya'yı 17 maçtır yenemiyor; Konya'da Destan yok", false],
@@ -2652,7 +2648,7 @@ async function kkKaydet(){
   if(!list.length){alert('Boş — önce seçim yap.');return;}
   try{const j=await(await fetch(API+'/tahmin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({tahminler:list})})).json();alert(list.length+' hane karneye kaydedildi ('+date+').'+(j.kalici?' ✓ kalıcı':''));if(typeof gecenHaftaCiz==='function')gecenHaftaCiz();}catch(e){alert('Kaydedilemedi: '+e.message);}
 }
-function buHaftaKuponCiz(){
+function buHaftaKuponCiz(){ return; /*
   const p=document.getElementById('stKuponPanel'); if(!p)return;
   if(!stKuponAcik){p.innerHTML='';const b=document.getElementById('stKuponBtn');if(b)b.textContent='📌 Bu Haftanın Kuponu';return;}
   const b=document.getElementById('stKuponBtn');if(b)b.textContent='📌 Kuponu gizle';
