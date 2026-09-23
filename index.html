@@ -268,6 +268,19 @@
   .aiLegend{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:7px 0 10px;font-size:.75rem;color:var(--muted)}
   .aiLegend .aiTah{min-width:auto;padding:3px 7px}
 
+
+  /* RADAR istatistik motoru v3 */
+  .probBadge{display:inline-flex;align-items:center;gap:4px;border-radius:7px;padding:3px 7px;font-size:.75rem;font-weight:800;white-space:nowrap;border:1px solid var(--line)}
+  .probBadge.yesil{background:#e8f7ef;color:#117647;border-color:#a9ddc0}
+  .probBadge.sari{background:#fff6d9;color:#9a6500;border-color:#efd17a}
+  .probBadge.kirmizi{background:#fdeaea;color:#b72f2f;border-color:#e8aaaa}
+  .radarStatBtn{background:#eef5fd;color:#0b63b6;border:1px solid #b9d3ee;border-radius:7px;padding:4px 8px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .radarStatRow td{background:#f8fbff!important;padding:0 8px!important;border-bottom:1px solid var(--line)}
+  .radarStatBox{display:none;padding:10px 8px 12px;font-size:.8rem}
+  .radarStatBox.open{display:block}
+  .factorGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:7px;margin-top:7px}
+  .factor{background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+  .factor b{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -1538,6 +1551,84 @@ function aiBosTahmin(m,pazar){
 function oranVeyaAi(oran,m,pazar,etiket){
   return oran!=null?ob(m.c,m.hn+' - '+m.an,etiket,oran):aiBosTahmin(m,pazar);
 }
+
+let radarStatsCache={};
+function probBadge(ad,p,not){
+  if(p==null||isNaN(+p))return '<span class="lig">—</span>';
+  p=Math.max(0,Math.min(100,Math.round(+p)));
+  return '<span class="probBadge '+aiRenk(p)+'" title="'+(not||'Model olasılığı')+'">'+ad+' %'+p+'</span>';
+}
+function iyPiyasaOlasilik(m){
+  if(!m||!m.iySonuc)return null;
+  return marjTemizle(m.iySonuc['1'],m.iySonuc['X'],m.iySonuc['2']);
+}
+function radarPazarProb(m,tip){
+  const a=(m&&m.ai)||{}, g=bultenAi[m&&m.c]||{};
+  if(tip==='gol23') return g.gol23!=null?g.gol23:(a.pGol23!=null?a.pGol23:(a.gol23!=null?a.gol23:null));
+  if(tip==='iy15'){
+    if(a.pIY15!=null)return a.pIY15;
+    if(g.iyskor){const r=skoruCoz(g.iyskor);if(r)return r.skorToplam>=2?62:38;}
+    return null;
+  }
+  if(tip==='iykg'){
+    if(a.pIYKG!=null)return a.pIYKG;
+    if(g.iykg===true)return 60;if(g.iykg===false)return 40;
+    return null;
+  }
+  return null;
+}
+function skorTahminHtml(m,lig){
+  const a=bultenAi[m.c];
+  if(!a||a.durum!=='ok'||!a.skor){
+    return '<button class="radarStatBtn" onclick="bultenAiGetir('+m.c+',\''+(m.hn||'').replace(/'/g,'’')+'\',\''+(m.an||'').replace(/'/g,'’')+'\',\''+(lig||'').replace(/'/g,'’')+'\')">🔮 Skor</button>';
+  }
+  const r=radarHesap(m.c,m), guv=r?Math.max(8,Math.min(42,Math.round(r.guven*.42))):null;
+  return '<span class="probBadge '+aiRenk((r&&r.guven)||55)+'" title="Skor yüzdesi tam skor olasılığı değil; model yön güveninden türetilen skor güvenidir">🔮 '+a.skor+(guv!=null?' · %'+guv:'')+'</span>';
+}
+function formPuan(form){
+  if(!form)return null; let p=0,n=0;
+  String(form).split('').forEach(x=>{if(x==='G'){p+=3;n++;}else if(x==='B'){p+=1;n++;}else if(x==='M'){n++;}});
+  return n?Math.round(p/(n*3)*100):null;
+}
+function h2hPuan(hh,ev){
+  if(!Array.isArray(hh)||!hh.length)return null;
+  let sc=0,n=0;
+  hh.slice(0,6).forEach(x=>{const z=(x.mac||'').match(/(\d+)\s*-\s*(\d+)/);if(!z)return; n++; const a=+z[1],b=+z[2];sc+=a>b?1:(a===b?.5:0);});
+  return n?Math.round(sc/n*100):null;
+}
+async function radarStatsToggle(c,ev,dep,lig,ulke,tarih){
+  const el=document.getElementById('rstat-'+c); if(!el)return;
+  el.classList.toggle('open');
+  if(!el.classList.contains('open'))return;
+  if(radarStatsCache[c]){el.innerHTML=radarStatsCache[c];return;}
+  el.innerHTML='<span class="wait">📊 Form, H2H, sakatlık, teknik direktör ve kadro verisi yükleniyor…</span>';
+  try{
+    const q1=API+'/macveri?ev='+encodeURIComponent(ev)+'&dep='+encodeURIComponent(dep)+(ulke?'&ulke='+encodeURIComponent(ulke):'');
+    const q2=API+'/kadro?ev='+encodeURIComponent(ev)+'&dep='+encodeURIComponent(dep)+'&tarih='+encodeURIComponent(tarih||bugunTR());
+    const rs=await Promise.allSettled([fetch(q1).then(r=>r.json()),fetch(q2).then(r=>r.json())]);
+    const gv=rs[0].status==='fulfilled'?rs[0].value:null, kd=rs[1].status==='fulfilled'?rs[1].value:null;
+    let h='<div><b>🧠 RADAR İstatistik Motoru</b> <span class="lig" style="display:inline">oran + form + H2H + sakatlık + kadro/teknik direktör</span></div><div class="factorGrid">';
+    if(gv&&gv.bulundu){
+      const fe=formPuan(gv.ev&&gv.ev.form), fd=formPuan(gv.dep&&gv.dep.form);
+      h+='<div class="factor"><b>📈 Son form</b><br>'+ev+': '+(gv.ev.form||'—')+(fe!=null?' · %'+fe:'')+'<br>'+dep+': '+(gv.dep.form||'—')+(fd!=null?' · %'+fd:'')+'</div>';
+      const hp=h2hPuan(gv.h2h,ev);
+      h+='<div class="factor"><b>🔁 Önceki maçlar / H2H</b><br>'+(gv.h2h&&gv.h2h.length?gv.h2h.slice(0,4).map(x=>x.mac).join(' · '):'veri yok')+(hp!=null?'<br>Ev tarafı H2H endeksi: %'+hp:'')+'</div>';
+      const se=(gv.ev.sakatlik||[]), sd=(gv.dep.sakatlik||[]);
+      h+='<div class="factor"><b>🚑 Sakatlık</b><br>'+ev+': '+(se.length?se.join(', '):'kayıtlı eksik yok')+'<br>'+dep+': '+(sd.length?sd.join(', '):'kayıtlı eksik yok')+'</div>';
+      const sr1=gv.ev.siralama, sr2=gv.dep.siralama;
+      h+='<div class="factor"><b>📊 Sıra / puan</b><br>'+ev+': '+(sr1?(sr1.sira+'. · '+(sr1.puan??'—')+'p'):'—')+'<br>'+dep+': '+(sr2?(sr2.sira+'. · '+(sr2.puan??'—')+'p'):'—')+'</div>';
+    }else h+='<div class="factor"><b>📊 Geçmiş veri</b><br>API-Football eşleşmesi bulunamadı.</div>';
+    if(kd&&kd.bulundu){
+      const t=(kd.takimlar||[]);
+      h+='<div class="factor"><b>🧑‍🏫 Teknik direktör / diziliş</b><br>'+t.map(x=>(x.takim||'')+': '+(x.teknikDirektor||'—')+(x.formasyon?' · '+x.formasyon:'')).join('<br>')+'</div>';
+      h+='<div class="factor"><b>👥 Kadro durumu</b><br>'+(kd.ilk11Hazir?'✅ İlk 11 verisi hazır':'⏳ İlk 11 henüz açıklanmadı')+'<br>'+t.map(x=>(x.takim||'')+': '+((x.ilk11||[]).length)+' ilk 11 · '+((x.yedekler||[]).length)+' yedek').join('<br>')+'</div>';
+      if(kd.sakatlar&&kd.sakatlar.length)h+='<div class="factor"><b>⚠️ Maç özel eksikler</b><br>'+kd.sakatlar.slice(0,8).map(x=>(x.takim||'')+' · '+(x.oyuncu||'')+(x.sebep?' ('+x.sebep+')':'')).join('<br>')+'</div>';
+    }else h+='<div class="factor"><b>👥 Kadro / teknik direktör</b><br>Maç kadrosu henüz yok veya fikstür eşleşmedi.</div>';
+    h+='</div><div class="lig" style="margin-top:7px">Yüzdeler olasılıksaldır. Veri bulunmayan faktör modele zorla eklenmez.</div>';
+    radarStatsCache[c]=h;el.innerHTML=h;
+  }catch(e){el.innerHTML='<span class="wait">İstatistik verisi alınamadı: '+e.message+'</span>';}
+}
+
 function elitDegistir(){
   elitMod=!elitMod;
   document.getElementById('btnElit').textContent=elitMod?'🌍 Tüm ligler':'⭐ Sadece büyük ligler';
@@ -1631,7 +1722,7 @@ function bulteniCizNesine(j){
   if(!genisMod){
     hedef.innerHTML=bultenAiListeCard()+`<div class="aiLegend"><b>🤖 AI renkleri:</b><span class="aiTah yesil">Yeşil ≥ %65</span><span class="aiTah sari">Sarı %55–64</span><span class="aiTah kirmizi">Kırmızı &lt; %55</span><span>Boş Nesine oran hücrelerinde olası sonucu gösterir.</span></div>`+tarihLigRender(j,(l,i)=>ligSar(l,i,`
       <div class="tablo-sarici"><table class="nesineAnaTablo">
-        <thead><tr><th>Saat</th><th>Karşılaşma</th><th>1</th><th>X</th><th>2</th><th>Alt</th><th>Üst</th><th>1-X</th><th>1-2</th><th>X-2</th><th>Var</th><th>Yok</th><th>RADAR</th><th>İma % 1/X/2</th><th>Hareket</th></tr></thead>
+        <thead><tr><th>Saat</th><th>Karşılaşma</th><th>1</th><th>X</th><th>2</th><th>Alt</th><th>Üst</th><th>1-X</th><th>1-2</th><th>X-2</th><th>Var</th><th>Yok</th><th>2-3 Gol</th><th>İY 1.5Ü</th><th>İY KG</th><th>İY Sonuç</th><th>Olası Skor</th><th>RADAR</th><th>İstatistik</th><th>İma % 1/X/2</th><th>Hareket</th></tr></thead>
         <tbody>${l.maclar.map(m=>`
           <tr>
             <td>${o_(m.t)}</td>
@@ -1646,10 +1737,17 @@ function bulteniCizNesine(j){
             <td>${oranVeyaAi(m.cifteSans&&m.cifteSans['X2'],m,'X2','ÇŞ X2')}</td>
             <td>${oranVeyaAi(m.kg&&m.kg['var'],m,'var','KG Var')}</td>
             <td>${oranVeyaAi(m.kg&&m.kg['yok'],m,'yok','KG Yok')}</td>
+            <td>${probBadge('2-3',radarPazarProb(m,'gol23'),'2-3 gol model olasılığı')}</td>
+            <td>${probBadge('İY Ü',radarPazarProb(m,'iy15'),'İlk yarı 1.5 üst model olasılığı')}</td>
+            <td>${probBadge('İY KG',radarPazarProb(m,'iykg'),'İlk yarı KG Var model olasılığı')}</td>
+            <td>${(()=>{const p=iyPiyasaOlasilik(m);if(!p)return '<span class="lig">—</span>';const a=[['1',p.p1],['X',p.pX],['2',p.p2]].sort((x,y)=>y[1]-x[1])[0];return probBadge('İY '+a[0],a[1],'Nesine ilk yarı oranından marjsız olasılık');})()}</td>
+            <td>${skorTahminHtml(m,l.lig)}</td>
             <td>${radarMiniHtml(m)}</td>
+            <td><button class="radarStatBtn" onclick="radarStatsToggle(${m.c},'${(m.hn||'').replace(/'/g,'’')}','${(m.an||'').replace(/'/g,'’')}','${(l.lig||'').replace(/'/g,'’')}','${(l.ulke||'').replace(/'/g,'’')}','${macTarih(m,j)}')">📊 Detay</button></td>
             <td>${m.ai?pr3(m.ai.p1,m.ai.pX,m.ai.p2):'—'}</td>
             <td style="font-size:.78rem">${hareketHtml(m)}</td>
-          </tr>`).join('')}
+          </tr>
+          <tr class="radarStatRow"><td colspan="21"><div id="rstat-${m.c}" class="radarStatBox"></div></td></tr>`).join('')}
         </tbody>
       </table></div>`));
   }else{
