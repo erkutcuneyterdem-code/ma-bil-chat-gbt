@@ -384,6 +384,24 @@
     footer{padding-left:12px!important}
     .radarGrid{grid-template-columns:1fr!important}
   }
+
+/* Screenshot-aligned match intelligence table v6 */
+.matchMainRow{cursor:default}
+.matchMainRow:hover td{background:#f8fbff!important}
+.matchNameSub{display:block;color:#7b91a8;font-size:.68rem;margin-top:3px;font-weight:600}
+.iyMarket{display:flex;flex-direction:column;align-items:center;gap:3px}
+.iyMarket .odd{font-weight:800;border:1px solid #c9dced;border-radius:6px;padding:2px 7px;background:#fff}
+.iyMarket .pct{font-size:.67rem;font-weight:800;border-radius:5px;padding:1px 5px}
+.scoreStack{font-size:.7rem;line-height:1.45;min-width:82px;color:#1266b1}
+.scoreStack b{display:inline-block;min-width:28px}
+.detailChevron{width:28px;height:28px;border:1px solid #c9dced;background:#edf6ff;color:#0c6fc5;border-radius:7px;cursor:pointer;font-weight:900}
+.radarStatRow.openRow td{padding:0!important}
+.radarActionBar{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid var(--line);background:#fbfdff;flex-wrap:wrap}
+.radarActionBar .left,.radarActionBar .right{display:flex;gap:8px;flex-wrap:wrap}
+.radarActionBar button{border:1px solid #c9dced;background:#f4f9fe;color:#244a70;border-radius:7px;padding:7px 12px;font-weight:800;cursor:pointer}
+.radarActionBar .primary{background:#0875d1;color:#fff;border-color:#0875d1}
+.leagueInsight{padding:6px 12px;background:#fffdf7;border-top:1px solid #e8eef5;color:#6d8094;font-size:.72rem}
+@media(max-width:1200px){.nesineAnaTablo th:nth-child(2),.nesineAnaTablo td:nth-child(2){min-width:230px!important}}
 </style>
 </head>
 <body>
@@ -1703,7 +1721,9 @@ function h2hPuan(hh,ev){
 }
 async function radarStatsToggle(c,ev,dep,lig,ulke,tarih){
   const el=document.getElementById('rstat-'+c); if(!el)return;
+  const row=el.closest('tr');
   el.classList.toggle('open');
+  if(row)row.classList.toggle('openRow',el.classList.contains('open'));
   if(!el.classList.contains('open'))return;
   if(radarStatsCache[c]){el.innerHTML=radarStatsCache[c];return;}
   el.innerHTML='<span class="wait">📊 Form, H2H, sakatlık, teknik direktör ve kadro verisi yükleniyor…</span>';
@@ -1780,7 +1800,9 @@ function radarSkorDagilim(m){
 }
 function radarTab(c,tab){
   const box=document.getElementById('rstat-'+c); if(!box)return;
-  box.querySelectorAll('[data-pane]').forEach(x=>x.style.display=x.dataset.pane===tab?'block':'none');
+  const map={matches:'stats',injury:'squads',coach:'squads'};
+  const pane=map[tab]||tab;
+  box.querySelectorAll('[data-pane]').forEach(x=>x.style.display=x.dataset.pane===pane?'block':'none');
   box.querySelectorAll('.radarTabs button').forEach(x=>x.classList.toggle('on',x.dataset.tab===tab));
 }
 function radarPanelHtml(c,ev,dep,lig,gv,kd,m){
@@ -1818,6 +1840,9 @@ function radarPanelHtml(c,ev,dep,lig,gv,kd,m){
     '<button class="on" data-tab="ai" onclick="radarTab('+c+',\'ai\')">📊 AI Analiz</button>'+
     '<button data-tab="stats" onclick="radarTab('+c+',\'stats\')">📈 İstatistikler</button>'+
     '<button data-tab="squads" onclick="radarTab('+c+',\'squads\')">👥 Kadrolar</button>'+
+    '<button data-tab="matches" onclick="radarTab('+c+',\'matches\')">⚽ Son Maçlar</button>'+
+    '<button data-tab="injury" onclick="radarTab('+c+',\'injury\')">🩺 Sakat/Cezalı</button>'+
+    '<button data-tab="coach" onclick="radarTab('+c+',\'coach\')">🛡️ Teknik Direktör</button>'+
     '<button data-tab="notes" onclick="radarTab('+c+',\'notes\')">📋 Maç Notları</button>'+
   '</div>'+
   '<div data-pane="ai">'+summary+'</div>'+
@@ -1919,11 +1944,11 @@ function bulteniCizNesine(j){
   if(!genisMod){
     hedef.innerHTML=bultenAiListeCard()+`<div class="aiLegend"><b>🤖 AI renkleri:</b><span class="aiTah yesil">Yeşil ≥ %65</span><span class="aiTah sari">Sarı %55–64</span><span class="aiTah kirmizi">Kırmızı &lt; %55</span><span>Boş Nesine oran hücrelerinde olası sonucu gösterir.</span></div>`+tarihLigRender(j,(l,i)=>ligSar(l,i,`
       <div class="tablo-sarici"><table class="nesineAnaTablo">
-        <thead><tr><th>Saat</th><th>Karşılaşma</th><th>1</th><th>X</th><th>2</th><th>Alt</th><th>Üst</th><th>1-X</th><th>1-2</th><th>X-2</th><th>Var</th><th>Yok</th><th>2-3 Gol</th><th>İY 1.5Ü</th><th>İY KG</th><th>İY Sonuç</th><th>Olası Skor</th><th>RADAR</th><th>İstatistik</th><th>İma % 1/X/2</th><th>Hareket</th></tr></thead>
+        <thead><tr><th>SAAT</th><th>KARŞILAŞMA</th><th>MS 1</th><th>MS X</th><th>MS 2</th><th>ALT</th><th>ÜST</th><th>1-X</th><th>1-2</th><th>X-2</th><th>VAR</th><th>YOK</th><th>2-3 GOL</th><th>İY 1.5Ü</th><th>İY KG</th><th>İY 1</th><th>İY X</th><th>İY 2</th><th>OLASI SKOR</th><th>RADAR</th><th>İMA %</th><th>HAREKET</th><th></th></tr></thead>
         <tbody>${l.maclar.map(m=>`
-          <tr>
+          <tr class="matchMainRow">
             <td>${o_(m.t)}</td>
-            <td><a href="javascript:void(0)" onclick="macSorgula('${(m.hn+' '+m.an).replace(/'/g,'’')}')" title="AI yorumu ve oranlar için tıkla" style="color:var(--text);text-decoration:none"><b>${m.hn} – ${m.an}</b> <span class="lig" style="display:inline">🤖</span></a></td>
+            <td><a href="javascript:void(0)" onclick="radarStatsToggle(${m.c},'${(m.hn||'').replace(/'/g,'’')}','${(m.an||'').replace(/'/g,'’')}','${(l.lig||'').replace(/'/g,'’')}','${(l.ulke||'').replace(/'/g,'’')}','${macTarih(m,j)}')" title="Maç analizini aç" style="color:var(--text);text-decoration:none"><b>${m.hn} – ${m.an}</b><span class="matchNameSub">${l.lig||''}</span></a></td>
             <td>${marketCell(m.ms&&m.ms['1'],marketProb(m,'1'),'MS 1',m.c,m.hn+' - '+m.an,'MS 1')}</td>
             <td>${marketCell(m.ms&&m.ms['X'],marketProb(m,'X'),'MS X',m.c,m.hn+' - '+m.an,'MS X')}</td>
             <td>${marketCell(m.ms&&m.ms['2'],marketProb(m,'2'),'MS 2',m.c,m.hn+' - '+m.an,'MS 2')}</td>
@@ -1937,14 +1962,14 @@ function bulteniCizNesine(j){
             <td>${marketCell(m.golAralik&&m.golAralik.g23,marketProb(m,'gol23'),'2-3 Gol',m.c,m.hn+' - '+m.an,'2-3 Gol')}</td>
             <td>${marketCell(m.iy15&&m.iy15.ust,marketProb(m,'iy15'),'İY 1.5 Üst',m.c,m.hn+' - '+m.an,'İY 1.5 Üst')}</td>
             <td>${marketCell(m.iykg&&m.iykg['var'],marketProb(m,'iykg'),'İY KG Var',m.c,m.hn+' - '+m.an,'İY KG Var')}</td>
-            <td>${(()=>{const p=iyPiyasaOlasilik(m);if(!p)return '<span class="lig">—</span>';const a=[['1',p.p1],['X',p.pX],['2',p.p2]].sort((x,y)=>y[1]-x[1])[0];return probBadge('İY '+a[0],a[1],'Nesine ilk yarı oranından marjsız olasılık');})()}</td>
-            <td>${skorTahminHtml(m,l.lig)}</td>
+            ${(()=>{const p=iyPiyasaOlasilik(m),o=m.iySonuc||{};return ['1','X','2'].map((k,ix)=>{const pp=p?[p.p1,p.pX,p.p2][ix]:null;return '<td><div class="iyMarket"><span class="odd">'+(o[k]!=null?o[k]:'—')+'</span>'+(pp!=null?'<span class="pct '+aiRenk(pp)+'">%'+Math.round(pp)+'</span>':'')+'</div></td>';}).join('');})()}
+            <td>${(()=>{const a=bultenAi[m.c];if(a&&a.durum==='ok'&&a.skor){const rows=radarSkorDagilim(m);return '<div class="scoreStack">'+rows.slice(0,3).map(x=>'<div><b>'+x[0]+'</b> %'+x[1]+'</div>').join('')+(rows.length>3?'<div>+'+(rows.length-3)+' skor</div>':'')+'</div>';}return skorTahminHtml(m,l.lig);})()}</td>
             <td>${radarMiniHtml(m)}</td>
-            <td><button class="radarStatBtn" onclick="radarStatsToggle(${m.c},'${(m.hn||'').replace(/'/g,'’')}','${(m.an||'').replace(/'/g,'’')}','${(l.lig||'').replace(/'/g,'’')}','${(l.ulke||'').replace(/'/g,'’')}','${macTarih(m,j)}')">📊 Detay</button></td>
             <td>${m.ai?pr3(m.ai.p1,m.ai.pX,m.ai.p2):'—'}</td>
             <td style="font-size:.78rem">${hareketHtml(m)}</td>
+            <td><button class="detailChevron" onclick="radarStatsToggle(${m.c},'${(m.hn||'').replace(/'/g,'’')}','${(m.an||'').replace(/'/g,'’')}','${(l.lig||'').replace(/'/g,'’')}','${(l.ulke||'').replace(/'/g,'’')}','${macTarih(m,j)}')">⌄</button></td>
           </tr>
-          <tr class="radarStatRow"><td colspan="21"><div id="rstat-${m.c}" class="radarStatBox"></div></td></tr>`).join('')}
+          <tr class="radarStatRow"><td colspan="23"><div id="rstat-${m.c}" class="radarStatBox"></div><div class="radarActionBar"><div class="left"><button>☆ Maçı Takibe Ekle</button><button onclick="tercihleriTemizleVeBasaDon()">🧹 Tercihleri temizle ve başa dön</button></div><div class="right"><button class="primary" onclick="sekmeAc('kuponyap')">🎟️ Kupona Ekle</button></div></div></td></tr>`).join('')}
         </tbody>
       </table></div>`));
   }else{
