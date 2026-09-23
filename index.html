@@ -2648,33 +2648,7 @@ async function kkKaydet(){
   if(!list.length){alert('Boş — önce seçim yap.');return;}
   try{const j=await(await fetch(API+'/tahmin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({tahminler:list})})).json();alert(list.length+' hane karneye kaydedildi ('+date+').'+(j.kalici?' ✓ kalıcı':''));if(typeof gecenHaftaCiz==='function')gecenHaftaCiz();}catch(e){alert('Kaydedilemedi: '+e.message);}
 }
-function buHaftaKuponCiz(){ return; /*
-  const p=document.getElementById('stKuponPanel'); if(!p)return;
-  if(!stKuponAcik){p.innerHTML='';const b=document.getElementById('stKuponBtn');if(b)b.textContent='📌 Bu Haftanın Kuponu';return;}
-  const b=document.getElementById('stKuponBtn');if(b)b.textContent='📌 Kuponu gizle';
-  const K=BU_HAFTA_KUPON, tuzakN=K.mac.filter(m=>m.tuzak).length;
-  const rozet=(bah)=>{const c=bah==='1X'?'#2e7d32':bah==='X2'?'#c77700':'#1565c0';return '<b style="background:'+c+';color:#fff;padding:2px 9px;border-radius:6px;font-size:13px;letter-spacing:.5px">'+bah+'</b>';};
-  let h='<div class="kart" style="border:2px solid var(--gold,#e0a800);margin-bottom:12px">';
-  h+='<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px">';
-  h+='<b style="font-size:16px">📌 Bu Haftanın Kuponu <span class="lig" style="display:inline">('+K.hafta+' · kilitli)</span></b>';
-  h+='<span class="lig" style="display:inline">🔒 0 banko · 🎭 '+tuzakN+' tuzak · sahte güven yok</span></div>';
-  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13.5px">';
-  h+='<thead><tr style="text-align:left;border-bottom:2px solid var(--line)"><th style="padding:5px 6px">#</th><th style="padding:5px 6px">Maç</th><th style="padding:5px 6px">Tahmin</th><th style="padding:5px 6px">Skor</th><th style="padding:5px 6px">Gerekçe</th></tr></thead><tbody>';
-  K.mac.forEach(m=>{
-    const tz=m.tuzak?' 🎭':'';
-    const bg=m.tuzak?'background:rgba(224,168,0,.08)':'';
-    h+='<tr style="border-bottom:1px solid var(--line);'+bg+'">';
-    h+='<td style="padding:5px 6px;color:var(--muted,#888)">'+m.no+'</td>';
-    h+='<td style="padding:5px 6px;white-space:nowrap"><b>'+m.ev+'</b> – '+m.dep+tz+'</td>';
-    h+='<td style="padding:5px 6px">'+rozet(m.bahis)+'</td>';
-    h+='<td style="padding:5px 6px;white-space:nowrap">'+m.skor+'</td>';
-    h+='<td style="padding:5px 6px;color:var(--muted,#777)">'+m.not+'</td></tr>';
-  });
-  h+='</tbody></table></div>';
-  h+='<div class="lig" style="margin-top:8px">🎯 Nihai yapı: <b>5 tekli + 8 çift + 2 üçlü = 2.304 kolon / 23.040 TL</b>. Tekliler: Başakşehir 1 · Fenerbahçe 1 · Leverkusen 1 · Tottenham 1 · Newcastle 1. Stuttgart–BVB tekliden 12’ye indi (Avrupa oranı Stuttgart favori). Tahminler olasılıksaldır; sonuçlar oynanınca otomatik işlenir.</div>';
-  h+='</div>';
-  p.innerHTML=h;
-}
+function buHaftaKuponCiz(){return;}
 // 🏆 Geçen hafta sonuçları + başarı oranı (karneden, çift şans doğru sayılır)
 let gecenHaftaAcik=true;
 function gecenHaftaAc(){gecenHaftaAcik=!gecenHaftaAcik;gecenHaftaCiz();}
