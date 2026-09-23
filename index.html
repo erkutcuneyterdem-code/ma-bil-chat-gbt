@@ -1858,6 +1858,16 @@ function kuponSec(c,mac,pazar,oran){
   kuponSecimler.push({c,mac,pazar,oran});
   kuponYenile();
 }
+function tercihleriTemizleVeBasaDon(){
+  kuponSecimler=[];
+  try{
+    localStorage.removeItem('macbil_kupon');
+    localStorage.removeItem('macbil_kupon_secimler');
+  }catch(e){}
+  kuponYenile();
+  window.scrollTo({top:0,behavior:'smooth'});
+  setTimeout(()=>{const n=document.getElementById('nesineListe');if(n)n.scrollIntoView({behavior:'smooth',block:'start'});},250);
+}
 function kuponCikar(c){
   kuponSecimler=kuponSecimler.filter(s=>s.c!==c);
   kuponYenile();
@@ -1882,7 +1892,7 @@ function kuponCiz(){
       <span>Birim: <input id="kuponBirim" type="number" value="${birim}" min="1" style="width:70px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:3px 6px" onchange="kuponCiz()"> ₺</span>
       <span>Olası dönüş: <b>${Math.round(toplam*birim*100)/100} ₺</b></span>
       <button onclick="kuponKaydet()" class="btn">💾 Kaydet</button>
-      <button onclick="kuponSecimler=[];kuponYenile()" class="btn" style="background:var(--red);color:#fff">Temizle</button>
+      <button onclick="tercihleriTemizleVeBasaDon()" class="btn" style="background:var(--red);color:#fff">🧹 Tercihleri temizle ve başa dön</button>
     </div>
     <div class="lig" style="margin-top:6px">${kuponSecimler.length} maçlık kombinede ima ${pr(ima)} — yani matematiksel beklenti her ${Math.max(1,Math.round(100/Math.max(ima,0.1)))} denemede ~1 tutmasıdır. Küçük oyna.</div>`;
 }
