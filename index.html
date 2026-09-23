@@ -1787,8 +1787,11 @@ async function radarStatsToggle(c,ev,dep,lig,ulke,tarih){
   try{
     const q1=API+'/macveri?ev='+encodeURIComponent(ev)+'&dep='+encodeURIComponent(dep)+(ulke?'&ulke='+encodeURIComponent(ulke):'');
     const q2=API+'/kadro?ev='+encodeURIComponent(ev)+'&dep='+encodeURIComponent(dep)+'&tarih='+encodeURIComponent(tarih||bugunTR());
-    const rs=await Promise.allSettled([fetch(q1).then(r=>r.json()),fetch(q2).then(r=>r.json())]);
-    const gv=rs[0].status==='fulfilled'?rs[0].value:null, kd=rs[1].status==='fulfilled'?rs[1].value:null;
+    const q3=API+'/hava?q='+encodeURIComponent(ev);
+    const q4=API+'/haberakis';
+    const q5=API+'/hakemozet';
+    const rs=await Promise.allSettled([fetch(q1).then(r=>r.json()),fetch(q2).then(r=>r.json()),fetch(q3).then(r=>r.json()),fetch(q4).then(r=>r.json()),fetch(q5).then(r=>r.json())]);
+    const gv=rs[0].status==='fulfilled'?rs[0].value:null, kd=rs[1].status==='fulfilled'?rs[1].value:null, hv=rs[2].status==='fulfilled'?rs[2].value:null, hb=rs[3].status==='fulfilled'?rs[3].value:null, hk=rs[4].status==='fulfilled'?rs[4].value:null;
     let h='<div><b>🧠 RADAR İstatistik Motoru</b> <span class="lig" style="display:inline">oran + form + H2H + sakatlık + kadro/teknik direktör</span></div><div class="factorGrid">';
     if(gv&&gv.bulundu){
       const fe=formPuan(gv.ev&&gv.ev.form), fd=formPuan(gv.dep&&gv.dep.form);
@@ -1808,7 +1811,7 @@ async function radarStatsToggle(c,ev,dep,lig,ulke,tarih){
     }else h+='<div class="factor"><b>👥 Kadro / teknik direktör</b><br>Maç kadrosu henüz yok veya fikstür eşleşmedi.</div>';
     h+='</div><div class="lig" style="margin-top:7px">Yüzdeler olasılıksaldır. Veri bulunmayan faktör modele zorla eklenmez.</div>';
     const m=macBul(c);
-    if(m)h=radarPanelHtml(c,ev,dep,lig,gv,kd,m);
+    if(m)h=radarPanelHtml(c,ev,dep,lig,gv,kd,m,hv,hb,hk);
     radarStatsCache[c]=h;el.innerHTML=h;
   }catch(e){el.innerHTML='<span class="wait">İstatistik verisi alınamadı: '+e.message+'</span>';}
 }
@@ -1857,12 +1860,12 @@ function radarSkorDagilim(m){
 }
 function radarTab(c,tab){
   const box=document.getElementById('rstat-'+c); if(!box)return;
-  const map={matches:'stats',injury:'squads',coach:'squads'};
+  const map={injury:'squads',coach:'squads'};
   const pane=map[tab]||tab;
   box.querySelectorAll('[data-pane]').forEach(x=>x.style.display=x.dataset.pane===pane?'block':'none');
   box.querySelectorAll('.radarTabs button').forEach(x=>x.classList.toggle('on',x.dataset.tab===tab));
 }
-function radarPanelHtml(c,ev,dep,lig,gv,kd,m){
+function radarPanelHtml(c,ev,dep,lig,gv,kd,m,hv,hb,hk){
   const R=radarHesap(c,m), ai=bultenAi[c]||{}, scores=radarSkorDagilim(m);
   const best=[];
   const push=(ad,p)=>{if(p!=null)best.push({ad,p:Math.round(p)});};
@@ -1871,6 +1874,13 @@ function radarPanelHtml(c,ev,dep,lig,gv,kd,m){
   const evf=gv&&gv.ev?formPuan(gv.ev.form):null, dpf=gv&&gv.dep?formPuan(gv.dep.form):null;
   const sakE=gv&&gv.ev&&gv.ev.sakatlik||[], sakD=gv&&gv.dep&&gv.dep.sakatlik||[];
   const teams=kd&&kd.takimlar||[];
+  const allNews=(hb&&hb.haberler)||[];
+  const norm=x=>String(x||'').toLocaleLowerCase('tr-TR');
+  const teamNews=allNews.filter(x=>{const t=norm(x.baslik);return t.includes(norm(ev))||t.includes(norm(dep));}).slice(0,6);
+  const trainingNews=teamNews.filter(x=>/antrenman|idman|kamp|hazırlık|çalışma|training|workout/i.test(x.baslik||''));
+  const injuryNews=teamNews.filter(x=>/sakat|cezalı|eksik|injur|suspens|kadrod/i.test(x.baslik||''));
+  const refereeNews=((hk&&hk.hakemler)||[]).filter(x=>{const z=norm((x.mac||'')+' '+(x.ad||''));return z.includes(norm(ev))||z.includes(norm(dep));}).slice(0,3);
+  const marketMove=m&&m.hareket&&m.hareket.degisim?m.hareket.degisim:null;
   const xgHome=(gv&&gv.ev&&gv.ev.xg!=null)?+gv.ev.xg:((R&&R.p1)?Math.max(.45,Math.min(2.4,R.p1/45)):null);
   const xgAway=(gv&&gv.dep&&gv.dep.xg!=null)?+gv.dep.xg:((R&&R.p2)?Math.max(.45,Math.min(2.4,R.p2/45)):null);
   const summary='<div class="radarGrid">'+
@@ -1898,7 +1908,15 @@ function radarPanelHtml(c,ev,dep,lig,gv,kd,m){
     '<div class="radarCard"><h4>🚑 Sakat / Cezalı</h4>'+(sakE.length||sakD.length?('<b>'+ev+'</b>: '+(sakE.join(', ')||'yok')+'<br><b>'+dep+'</b>: '+(sakD.join(', ')||'yok')):'Kayıtlı eksik yok / veri yok.')+'</div>'+
     '<div class="radarCard"><h4>🧑‍🏫 Teknik Direktör</h4>'+(kd&&kd.bulundu?teams.map(x=>(x.takim||'')+': '+(x.teknikDirektor||'—')+(x.formasyon?' · '+x.formasyon:'')).join('<br>'):'Veri yok.')+'</div>'+
   '</div>';
-  const notes='<div class="radarCard"><h4>📋 Maç Notları</h4><div>'+(ai.yorum||'AI analizini çalıştırınca maç yorumu burada görünür.')+'</div><div class="lig" style="margin-top:8px">Veri olmayan faktörler uydurulmaz; yüzde ve tahminler olasılıksaldır.</div></div>';
+  const conditions='<div class="radarGrid">'+
+    '<div class="radarCard"><h4>🧾 Son 5 Maç & Gol</h4>'+(gv&&gv.bulundu?('<b>'+ev+'</b>: '+(gv.ev.form||'—')+'<br><b>'+dep+'</b>: '+(gv.dep.form||'—')):'Veri yok')+'<div class="lig" style="margin-top:6px">Form + gol/xG trendi birlikte değerlendirilir.</div></div>'+
+    '<div class="radarCard"><h4>🌦️ Hava / Saha</h4>'+((hv&&(hv.cevap||hv.ozet||hv.hava||hv.durum))?(hv.cevap||hv.ozet||hv.hava||hv.durum):'Doğrulanmış hava verisi yok.')+'<div class="lig" style="margin-top:6px">Rüzgâr, yağış, sıcaklık ve zemin tempo/gol beklentisini etkileyebilir.</div></div>'+
+    '<div class="radarCard"><h4>🏃 Antrenman / Hazırlık</h4>'+(trainingNews.length?trainingNews.map(x=>'• '+x.baslik).join('<br>'):'Takıma özel antrenman haberi bulunamadı.')+'</div>'+
+    '<div class="radarCard"><h4>⚖️ Hakem</h4>'+(refereeNews.length?refereeNews.map(x=>'• <b>'+(x.ad||'Hakem')+'</b>'+(x.egilim?' · '+x.egilim:'')+(x.tartisma?' · '+x.tartisma:'')).join('<br>'):'Bu maç için doğrulanmış hakem etkisi yok.')+'</div>'+
+    '<div class="radarCard"><h4>📉 Bahis Piyasası</h4>'+(marketMove?('1: '+(marketMove['1']??'—')+'% · X: '+(marketMove['X']??'—')+'% · 2: '+(marketMove['2']??'—')+'%'):'Oran hareketi verisi yok.')+'<div class="lig" style="margin-top:6px">Piyasa hareketi yardımcı sinyaldir; tek başına karar verilmez.</div></div>'+
+    '<div class="radarCard"><h4>📰 Etkileyen Haberler</h4>'+(teamNews.length?teamNews.map(x=>'• '+x.baslik).join('<br>'):'Takımla eşleşen güncel haber bulunamadı.')+(injuryNews.length?'<div class="lig" style="margin-top:6px">Eksik/sakatlık sinyali: '+injuryNews.length+' haber</div>':'')+'</div>'+
+  '</div>';
+  const notes='<div class="radarCard"><h4>📋 Maç Notları</h4><div>'+(ai.yorum||'AI analizini çalıştırınca maç yorumu burada görünür.')+'</div><div class="lig" style="margin-top:8px">Veri olmayan faktörler uydurulmaz. Bahis sitesi yorumları doğrulanmış haber ve oran hareketinden ayrı tutulur.</div></div>';
   return '<div class="radarTabs">'+
     '<button class="on" data-tab="ai" onclick="radarTab('+c+',\'ai\')">📊 AI Analiz</button>'+
     '<button data-tab="stats" onclick="radarTab('+c+',\'stats\')">📈 İstatistikler</button>'+
@@ -1911,6 +1929,7 @@ function radarPanelHtml(c,ev,dep,lig,gv,kd,m){
   '<div data-pane="ai">'+summary+'</div>'+
   '<div data-pane="stats" style="display:none">'+stats+'</div>'+
   '<div data-pane="squads" style="display:none">'+squads+'</div>'+
+  '<div data-pane="matches" style="display:none">'+conditions+'</div>'+
   '<div data-pane="notes" style="display:none">'+notes+'</div>';
 }
 
