@@ -281,6 +281,21 @@
   .factorGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:7px;margin-top:7px}
   .factor{background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 9px}
   .factor b{color:var(--accent)}
+
+  /* Oran tablosu sağ kolon görünürlük düzeltmesi */
+  .tablo-sarici{overflow-x:auto!important;overflow-y:visible;-webkit-overflow-scrolling:touch}
+  .nesineAnaTablo{width:max-content!important;min-width:100%!important;table-layout:auto!important}
+  .nesineAnaTablo th,.nesineAnaTablo td{white-space:nowrap!important;min-width:72px}
+  .nesineAnaTablo th:nth-child(1),.nesineAnaTablo td:nth-child(1){min-width:70px}
+  .nesineAnaTablo th:nth-child(2),.nesineAnaTablo td:nth-child(2){min-width:360px;max-width:440px}
+  .nesineAnaTablo th:nth-child(n+13),.nesineAnaTablo td:nth-child(n+13){min-width:105px}
+  .nesineAnaTablo th:nth-child(17),.nesineAnaTablo td:nth-child(17){min-width:135px}
+  .nesineAnaTablo th:nth-child(18),.nesineAnaTablo td:nth-child(18){min-width:130px}
+  .nesineAnaTablo th:nth-child(19),.nesineAnaTablo td:nth-child(19){min-width:105px}
+  .nesineAnaTablo th:nth-child(20),.nesineAnaTablo td:nth-child(20){min-width:150px}
+  .nesineAnaTablo th:nth-child(21),.nesineAnaTablo td:nth-child(21){min-width:125px}
+  .radarMini{min-width:118px;white-space:normal!important;line-height:1.25}
+  .radarStatBtn{min-width:88px}
 </style>
 </head>
 <body>
