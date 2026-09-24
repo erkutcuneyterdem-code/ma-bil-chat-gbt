@@ -900,7 +900,7 @@ async function bultenAiHepsi(){
   if(bultenAiCalisiyor||!sonBulten)return;
   bultenAiCalisiyor=true;bultenAiListe=true;
   const hepsi=[];
-  sonBulten.ligler.forEach(l=>l.maclar.forEach(m=>{if(m.ai&&m.ai.puan!=null)hepsi.push({m,lig:l.lig});}));
+  (sonBulten.ligler||[]).forEach(l=>(l.maclar||[]).forEach(m=>{if(m.ai&&m.ai.puan!=null)hepsi.push({m,lig:l.lig});}));
   hepsi.sort((a,b)=>b.m.ai.puan-a.m.ai.puan);
   const sec=hepsi.slice(0,20);
   const btn=document.getElementById('btnBultenAi');
@@ -1631,7 +1631,8 @@ function ligSar(l,i,icerikHtml){
   return `<details class="ligAcc"${acik}><summary><span class="bayrak">${ulkeBayrak(l.ulke,l.lig)}</span><span class="adi">${l.lig}${l.ulke?`<span class="ulke">${l.ulke} · ${tur==='kupa'?'Kupa':'Lig'}</span>`:''}</span><span class="say">${l.maclar.length} maç</span><span class="ok">▶</span></summary><div class="ligAccIc">${not}${ligHaberSatir(l)}${icerikHtml}</div></details>`;
 }
 function bultenLiglerFiltreli(j){
-  let L=j.ligler||[];
+  if(!j||typeof j!=='object')return [];
+  let L=Array.isArray(j.ligler)?j.ligler:[];
   if(bultenFiltre==='lig')L=L.filter(l=>ligTuru(l.lig)==='lig');
   else if(bultenFiltre==='kupa')L=L.filter(l=>ligTuru(l.lig)==='kupa');
   else if(bultenFiltre==='turkiye')L=L.filter(l=>/türkiye|turkey/i.test((l.ulke||'')+' '+(l.lig||''))||/süper lig|trendyol|1\. lig/i.test(l.lig||''));
@@ -2185,12 +2186,15 @@ async function bulteniYukle(){
   st.textContent='Nesine bülteni yükleniyor…';
   try{
     const r=await fetch(API+'/gunluk');
-    const j=await r.json();
+    const raw=await r.json();
+    const j=(raw&&typeof raw==='object')?raw:{};
+    if(!Array.isArray(j.ligler))j.ligler=[];
+    j.ligler=j.ligler.filter(Boolean).map(l=>({...l,maclar:Array.isArray(l.maclar)?l.maclar:[]}));
     sonBulten=j;
     const _ds=bultenTarihler(j);
     st.textContent=`${_ds.length>1?(_ds[0]+' → '+_ds[_ds.length-1]):(j.date||_ds[0]||'')} · ${j.ligSayisi||((j.ligler||[]).length)} lig · ${j.macSayisi||((j.ligler||[]).reduce((n,l)=>n+(l.maclar||[]).length,0))} maç`;
     bulteniCizNesine(j);
-    radarCiz();
+    try{radarCiz();}catch(re){console.warn('RADAR render:',re);}
     bultenHaberYukle();
   }catch(e){st.textContent='Bülten alınamadı: '+e.message;}
 }
@@ -2341,7 +2345,7 @@ function radarCiz(){
   const hedef=document.getElementById('radarListe');
   if(!sonBulten){hedef.textContent='Bülten verisi bekleniyor…';return;}
   const hepsi=[];
-  sonBulten.ligler.forEach(l=>l.maclar.forEach(m=>{
+  (sonBulten.ligler||[]).forEach(l=>(l.maclar||[]).forEach(m=>{
     if(!m.hareket||!m.hareket.degisim)return;
     const d=m.hareket.degisim;
     const enB=Math.max(Math.abs(d['1']||0),Math.abs(d['X']||0),Math.abs(d['2']||0));
