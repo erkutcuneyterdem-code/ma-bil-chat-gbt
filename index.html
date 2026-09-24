@@ -1840,6 +1840,104 @@ function marketProb(m,key){
   if(key==='iykg')return radarPazarProb(m,'iykg');
   return null;
 }
+
+const dcModelCache={};
+function dcPois(k,l){let f=1;for(let i=2;i<=k;i++)f*=i;return Math.exp(-l)*Math.pow(l,k)/f;}
+function dcTau(i,j,lh,la,rho){
+  if(i===0&&j===0)return 1-lh*la*rho;
+  if(i===0&&j===1)return 1+lh*rho;
+  if(i===1&&j===0)return 1+la*rho;
+  if(i===1&&j===1)return 1-rho;
+  return 1;
+}
+function dcDist(lh,la,rho=-0.14,max=9){
+  const a=[];let z=0;
+  for(let i=0;i<=max;i++){a[i]=[];for(let j=0;j<=max;j++){
+    const p=dcPois(i,lh)*dcPois(j,la)*dcTau(i,j,lh,la,rho);a[i][j]=Math.max(0,p);z+=a[i][j];
+  }}
+  if(z>0)for(let i=0;i<=max;i++)for(let j=0;j<=max;j++)a[i][j]/=z;
+  return a;
+}
+function dcMarkets(lh,la,rho=-0.14,half=.45){
+  const d=dcDist(lh,la,rho,9);
+  let p1=0,px=0,p2=0,kg=0,over25=0,g23=0,g01=0;
+  const scores=[];
+  for(let i=0;i<d.length;i++)for(let j=0;j<d[i].length;j++){
+    const p=d[i][j],t=i+j;
+    if(i>j)p1+=p;else if(i===j)px+=p;else p2+=p;
+    if(i>0&&j>0)kg+=p;
+    if(t>=3)over25+=p;
+    if(t>=2&&t<=3)g23+=p;
+    if(t<=1)g01+=p;
+    scores.push({s:i+'-'+j,p});
+  }
+  scores.sort((a,b)=>b.p-a.p);
+  const dh=dcDist(lh*half,la*half,rho,7);
+  let iykg=0,iy05=0,iy1=0,iyx=0,iy2=0;
+  for(let i=0;i<dh.length;i++)for(let j=0;j<dh[i].length;j++){
+    const p=dh[i][j];
+    if(i>0&&j>0)iykg+=p;
+    if(i+j>=1)iy05+=p;
+    if(i>j)iy1+=p;else if(i===j)iyx+=p;else iy2+=p;
+  }
+  return {p1,px,p2,kg,over25,g23,g01,iykg,iy05,iy1,iyx,iy2,scores:scores.slice(0,5)};
+}
+function dcBinary(a,b){
+  a=+a;b=+b;if(!(a>1&&b>1))return null;
+  const x=1/a,y=1/b,z=x+y;return {a:x/z,b:y/z};
+}
+function dcFit(m){
+  if(!m)return null;
+  if(dcModelCache[m.c])return dcModelCache[m.c];
+  const ms=m.ms||{}, au=m.au25||{};
+  const p=marjTemizle(ms['1'],ms['X'],ms['2']);
+  const ou=dcBinary(au.ust,au.alt);
+  if(!p||!ou)return null;
+  const target={p1:p.p1/100,px:p.pX/100,p2:p.p2/100,ou:ou.a};
+  let best=null;
+  const loss=(lh,la)=>{
+    const x=dcMarkets(lh,la,-0.14,.45);
+    return Math.pow(x.p1-target.p1,2)+Math.pow(x.px-target.px,2)+Math.pow(x.p2-target.p2,2)+1.35*Math.pow(x.over25-target.ou,2);
+  };
+  for(let lh=.2;lh<=4.2;lh+=.12)for(let la=.2;la<=4.2;la+=.12){
+    const L=loss(lh,la);if(!best||L<best.L)best={lh,la,L};
+  }
+  const bh=best.lh,ba=best.la;
+  for(let lh=Math.max(.12,bh-.18);lh<=bh+.18;lh+=.025)for(let la=Math.max(.12,ba-.18);la<=ba+.18;la+=.025){
+    const L=loss(lh,la);if(L<best.L)best={lh,la,L};
+  }
+  const out=dcMarkets(best.lh,best.la,-0.14,.45);
+  out.lh=best.lh;out.la=best.la;out.rho=-0.14;out.half=.45;out.loss=best.L;
+  dcModelCache[m.c]=out;return out;
+}
+function dcPct(x){return x==null?'—':'%'+Math.round(x*100);}
+function dcFair(x){return x&&x>0?(1/x).toFixed(2):'—';}
+function dcDecision(x){const p=(x||0)*100;return p>=60?'AL':(p>=52?'DİKKATLİ':'KAÇ');}
+function dcValue(oran,p){
+  if(!(oran>1&&p>0))return '';
+  const fair=1/p;
+  return (oran<=3.41&&oran>=fair*1.10)?' · <b class="c-y">DEĞER</b>':'';
+}
+function dcModelHtml(m){
+  const d=dcFit(m);
+  if(!d)return '<div class="radarCard"><h4>🧮 Poisson + Dixon-Coles</h4>MS 1/X/2 ve 2,5 Alt/Üst oranları birlikte bulunamadığı için model kurulamadı.</div>';
+  const ms=m.ms||{},au=m.au25||{},kg=m.kg||{};
+  const rows=[
+    ['KG Var',d.kg,kg['var']],['KG Yok',1-d.kg,kg['yok']],
+    ['2,5 Üst',d.over25,au.ust],['2,5 Alt',1-d.over25,au.alt],
+    ['2-3 Gol',d.g23,m.golAralik&&m.golAralik.g23],
+    ['0-1 Gol',d.g01,null],['İY KG Var',d.iykg,m.iykg&&m.iykg['var']],
+    ['İY 0,5 Üst',d.iy05,null]
+  ];
+  return '<div class="radarGrid">'+
+    '<div class="radarCard"><h4>λ / Gol Beklentisi</h4><div><b>'+m.hn+'</b>: '+d.lh.toFixed(2)+'</div><div><b>'+m.an+'</b>: '+d.la.toFixed(2)+'</div><div style="margin-top:6px">Toplam λ: <b>'+(d.lh+d.la).toFixed(2)+'</b></div><div class="lig" style="margin-top:6px">ρ = −0,14 · İY payı %45</div></div>'+
+    '<div class="radarCard"><h4>1 / X / 2 Model</h4><div>1: <b>'+dcPct(d.p1)+'</b> · adil '+dcFair(d.p1)+'</div><div>X: <b>'+dcPct(d.px)+'</b> · adil '+dcFair(d.px)+'</div><div>2: <b>'+dcPct(d.p2)+'</b> · adil '+dcFair(d.p2)+'</div></div>'+
+    '<div class="radarCard"><h4>Piyasa / Adil Oran / Karar</h4>'+rows.map(r=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0"><span>'+r[0]+'</span><span><b>'+dcPct(r[1])+'</b> · '+dcFair(r[1])+' · '+dcDecision(r[1])+dcValue(r[2],r[1])+'</span></div>').join('')+'</div>'+
+    '<div class="radarCard"><h4>İlk Yarı</h4><div>İY 1: <b>'+dcPct(d.iy1)+'</b></div><div>İY X: <b>'+dcPct(d.iyx)+'</b></div><div>İY 2: <b>'+dcPct(d.iy2)+'</b></div><div>İY KG: <b>'+dcPct(d.iykg)+'</b></div><div>İY 0,5 Üst: <b>'+dcPct(d.iy05)+'</b></div></div>'+
+    '<div class="radarCard"><h4>Doğru Skor</h4>'+d.scores.map(x=>'<div style="display:flex;justify-content:space-between"><span>'+x.s+'</span><b>'+dcPct(x.p)+' · '+dcFair(x.p)+'</b></div>').join('')+'</div>'+
+  '</div><div class="lig" style="margin-top:8px">PDF yöntemi: Nesine MS ve 2,5 piyasası marjdan arındırılır; λ değerleri Poisson + Dixon-Coles ile oturtulur. Karar eşiği: AL ≥ %60, DİKKATLİ %52–59, KAÇ &lt; %52. Kadro/haber/hava düzeltmeleri bu matematik katmanından ayrı gösterilir.</div>';
+}
+
 function radarSkorDagilim(m){
   const a=bultenAi[m.c], rows=[];
   if(a&&a.durum==='ok'&&a.skor){
@@ -1915,6 +2013,7 @@ function radarPanelHtml(c,ev,dep,lig,gv,kd,m,hv,hb,hk){
   const notes='<div class="radarCard"><h4>📋 Maç Notları</h4><div>'+(ai.yorum||'AI analizini çalıştırınca maç yorumu burada görünür.')+'</div><div class="lig" style="margin-top:8px">Veri olmayan faktörler uydurulmaz. Bahis sitesi yorumları doğrulanmış haber ve oran hareketinden ayrı tutulur.</div></div>';
   return '<div class="radarTabs">'+
     '<button class="on" data-tab="ai" onclick="radarTab('+c+',\'ai\')">📊 AI Analiz</button>'+
+    '<button data-tab="model" onclick="radarTab('+c+',\'model\')">🧮 Poisson/DC</button>'+
     '<button data-tab="stats" onclick="radarTab('+c+',\'stats\')">📈 İstatistikler</button>'+
     '<button data-tab="squads" onclick="radarTab('+c+',\'squads\')">👥 Kadrolar</button>'+
     '<button data-tab="matches" onclick="radarTab('+c+',\'matches\')">⚽ Son Maçlar</button>'+
@@ -1923,6 +2022,7 @@ function radarPanelHtml(c,ev,dep,lig,gv,kd,m,hv,hb,hk){
     '<button data-tab="notes" onclick="radarTab('+c+',\'notes\')">📋 Maç Notları</button>'+
   '</div>'+
   '<div data-pane="ai">'+summary+'</div>'+
+  '<div data-pane="model" style="display:none">'+dcModelHtml(m)+'</div>'+
   '<div data-pane="stats" style="display:none">'+stats+'</div>'+
   '<div data-pane="squads" style="display:none">'+squads+'</div>'+
   '<div data-pane="matches" style="display:none">'+conditions+'</div>'+
