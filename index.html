@@ -900,8 +900,8 @@ async function bultenAiHepsi(){
   if(bultenAiCalisiyor||!sonBulten)return;
   bultenAiCalisiyor=true;bultenAiListe=true;
   const hepsi=[];
-  (sonBulten.ligler||[]).forEach(l=>(l.maclar||[]).forEach(m=>{if(m.ai&&m.ai.puan!=null)hepsi.push({m,lig:l.lig});}));
-  hepsi.sort((a,b)=>b.m.ai.puan-a.m.ai.puan);
+  (sonBulten.ligler||[]).forEach(l=>(l.maclar||[]).forEach(m=>{if(m.ai&&m.modelP!=null)hepsi.push({m,lig:l.lig});}));
+  hepsi.sort((a,b)=>b.m.modelP-a.m.modelP);
   const sec=hepsi.slice(0,20);
   const btn=document.getElementById('btnBultenAi');
   for(let k=0;k<sec.length;k++){
@@ -1340,7 +1340,7 @@ async function enUygunKupon(){
   const aday=[];
   (bultenLiglerFiltreli(sonBulten)||[]).forEach(l=>(l.maclar||[]).forEach(m=>{
     const ai=m.ai, cand=[];
-    if(ai&&ai.puan!=null&&m.ms&&(ai.fav==='1'||ai.fav==='2')&&m.ms[ai.fav])cand.push({pazar:'MS '+ai.fav,oran:m.ms[ai.fav],prob:ai.puan});
+    if(ai&&modelP!=null&&m.ms&&(ai.fav==='1'||ai.fav==='2')&&m.ms[ai.fav])cand.push({pazar:'MS '+ai.fav,oran:m.ms[ai.fav],prob:modelP});
     if(ai&&m.cifteSans){
       if(ai.fav==='1'&&m.cifteSans['1X'])cand.push({pazar:'ÇŞ 1X',oran:m.cifteSans['1X'],prob:Math.min(97,(ai.p1||0)+(ai.pX||0))});
       if(ai.fav==='2'&&m.cifteSans['X2'])cand.push({pazar:'ÇŞ X2',oran:m.cifteSans['X2'],prob:Math.min(97,(ai.p2||0)+(ai.pX||0))});
@@ -1914,6 +1914,32 @@ function dcFit(m){
 function dcPct(x){return x==null?'—':'%'+Math.round(x*100);}
 function dcFair(x){return x&&x>0?(1/x).toFixed(2):'—';}
 function dcDecision(x){const p=(x||0)*100;return p>=60?'AL':(p>=52?'DİKKATLİ':'KAÇ');}
+function dcStrength(x){const p=(x||0)*100;return p>=60?'GÜÇLÜ':(p>=52?'ORTA / YAZI-TURA':'ZAYIF');}
+function dcStructure(d){
+  if(!d)return '';
+  const yok=1-d.kg, ust=d.over25;
+  if(yok>=.60&&ust>=.60)return 'Tek taraflı yüksek skor profili';
+  if(yok>=.60&&(1-ust)>=.60)return 'Düşük skor / kontrollü maç';
+  if(d.kg>=.60&&ust>=.60)return 'Karşılıklı gollü yüksek tempo';
+  if(d.kg>=.60&&(1-ust)>=.60)return 'KG var ama toplam gol sınırlı';
+  return 'Dengeli / kararsız profil';
+}
+function dcMovementInsight(m,d){
+  const h=m&&m.hareket;
+  if(!h||!h.acilis||!h.guncel)return {html:'Oran hareketi yok.',score:0};
+  const a=h.acilis,g=h.guncel,deg=h.degisim||{};
+  const parts=[];
+  ['1','X','2'].forEach(k=>{
+    if(a[k]!=null&&g[k]!=null&&a[k]!==g[k])parts.push(k+' '+a[k]+' → '+g[k]+(deg[k]!=null?' ('+(deg[k]>0?'+':'')+deg[k]+'%)':''));
+  });
+  let score=0,label='Nötr';
+  const fav=[['1',d.p1],['X',d.px],['2',d.p2]].sort((x,y)=>y[1]-x[1])[0];
+  const fv=deg[fav[0]];
+  if(fv!=null&&fv<=-1.2){score=2;label='Güçlü piyasa teyidi';}
+  else if(fv!=null&&fv<=-.4){score=1;label='Piyasa teyidi';}
+  else if(fv!=null&&fv>=1.2){score=-1;label='Model-piyasa ayrışması';}
+  return {html:(parts.length?parts.join(' · '):'Anlamlı hareket yok')+'<div class="lig" style="margin-top:4px">'+label+'</div>',score};
+}
 function dcValue(oran,p){
   if(!(oran>1&&p>0))return '';
   const fair=1/p;
@@ -1930,13 +1956,17 @@ function dcModelHtml(m){
     ['0-1 Gol',d.g01,null],['İY KG Var',d.iykg,m.iykg&&m.iykg['var']],
     ['İY 0,5 Üst',d.iy05,null]
   ];
+  const mv=dcMovementInsight(m,d);
+  const profile=dcStructure(d);
   return '<div class="radarGrid">'+
     '<div class="radarCard"><h4>λ / Gol Beklentisi</h4><div><b>'+m.hn+'</b>: '+d.lh.toFixed(2)+'</div><div><b>'+m.an+'</b>: '+d.la.toFixed(2)+'</div><div style="margin-top:6px">Toplam λ: <b>'+(d.lh+d.la).toFixed(2)+'</b></div><div class="lig" style="margin-top:6px">ρ = −0,14 · İY payı %45</div></div>'+
     '<div class="radarCard"><h4>1 / X / 2 Model</h4><div>1: <b>'+dcPct(d.p1)+'</b> · adil '+dcFair(d.p1)+'</div><div>X: <b>'+dcPct(d.px)+'</b> · adil '+dcFair(d.px)+'</div><div>2: <b>'+dcPct(d.p2)+'</b> · adil '+dcFair(d.p2)+'</div></div>'+
-    '<div class="radarCard"><h4>Piyasa / Adil Oran / Karar</h4>'+rows.map(r=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0"><span>'+r[0]+'</span><span><b>'+dcPct(r[1])+'</b> · '+dcFair(r[1])+' · '+dcDecision(r[1])+dcValue(r[2],r[1])+'</span></div>').join('')+'</div>'+
+    '<div class="radarCard"><h4>Piyasa / Adil Oran / Karar</h4>'+rows.map(r=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0"><span>'+r[0]+'</span><span><b>'+dcPct(r[1])+'</b> · '+dcFair(r[1])+' · '+dcDecision(r[1])+' · '+dcStrength(r[1])+dcValue(r[2],r[1])+'</span></div>').join('')+'</div>'+
+    '<div class="radarCard"><h4>📐 Maç Profili</h4><b>'+profile+'</b><div class="lig" style="margin-top:6px">KG Yok + Üst birlikte güçlüyse bu çelişki değil; tek taraflı 0-3 / 0-4 / 1-3 tipi skor yapısı olarak yorumlanır.</div></div>'+
+    '<div class="radarCard"><h4>📉 Oran Hareketi / Teyit</h4>'+mv.html+'<div class="lig" style="margin-top:6px">Model yönü ile piyasa aynı yöndeyse güven teyidi; ters yöndeyse uyarı üretir.</div></div>'+
     '<div class="radarCard"><h4>İlk Yarı</h4><div>İY 1: <b>'+dcPct(d.iy1)+'</b></div><div>İY X: <b>'+dcPct(d.iyx)+'</b></div><div>İY 2: <b>'+dcPct(d.iy2)+'</b></div><div>İY KG: <b>'+dcPct(d.iykg)+'</b></div><div>İY 0,5 Üst: <b>'+dcPct(d.iy05)+'</b></div></div>'+
     '<div class="radarCard"><h4>Doğru Skor</h4>'+d.scores.map(x=>'<div style="display:flex;justify-content:space-between"><span>'+x.s+'</span><b>'+dcPct(x.p)+' · '+dcFair(x.p)+'</b></div>').join('')+'</div>'+
-  '</div><div class="lig" style="margin-top:8px">PDF yöntemi: Nesine MS ve 2,5 piyasası marjdan arındırılır; λ değerleri Poisson + Dixon-Coles ile oturtulur. Karar eşiği: AL ≥ %60, DİKKATLİ %52–59, KAÇ &lt; %52. Kadro/haber/hava düzeltmeleri bu matematik katmanından ayrı gösterilir.</div>';
+  '</div><div class="lig" style="margin-top:8px">RADAR kalibrasyonu: ≥ %60 güçlü sinyal; %52–59 orta/yazı-tura; &lt; %52 zayıf. Oran hareketi bağımsız teyit katmanıdır. Kadro/haber/hava düzeltmeleri matematik katmanından ayrı tutulur.</div>';
 }
 
 function radarSkorDagilim(m){
@@ -2048,7 +2078,7 @@ function stEtiket(prob){
 function enIyiPazar(ai){
   if(!ai)return null;
   const c=[];
-  if(ai.fav==='1'||ai.fav==='2')c.push({p:ai.puan,pazar:'MS '+ai.fav});
+  if(ai.fav==='1'||ai.fav==='2')c.push({p:modelP,pazar:'MS '+ai.fav});
   if(ai.pUst25!=null)c.push(ai.pUst25>=50?{p:ai.pUst25,pazar:'2.5 Üst'}:{p:100-ai.pUst25,pazar:'2.5 Alt'});
   if(ai.pKG!=null)c.push(ai.pKG>=50?{p:ai.pKG,pazar:'KG Var'}:{p:100-ai.pKG,pazar:'KG Yok'});
   if(ai.pIY15!=null&&ai.pIY15>=55)c.push({p:ai.pIY15,pazar:'İY 1.5 Üst'});
@@ -2064,17 +2094,22 @@ function oynaBadge(ai){
 }
 // ====== Değer & Piyasa Sinyali (key'siz — oran hareketi + AI) ======
 function degerSinyalHesap(m){
-  if(!m.hareket||!m.hareket.degisim||!m.ai||!m.ai.fav)return null;
-  const d=m.hareket.degisim, ai=m.ai, fav=ai.fav;
+  if(!m.hareket||!m.hareket.degisim)return null;
+  const dc=dcFit(m), ai=m.ai||{};
+  const dcFav=dc?[['1',dc.p1],['X',dc.px],['2',dc.p2]].sort((a,b)=>b[1]-a[1])[0][0]:null;
+  const fav=ai.fav||dcFav;
+  if(!fav)return null;
+  const d=m.hareket.degisim;
   const yon=['1','X','2'].filter(k=>d[k]!=null);
-  if(!yon.length||ai.puan==null)return null;
+  const modelP=modelP!=null?modelP:(dc?Math.round(Math.max(dc.p1,dc.px,dc.p2)*100):null);
+  if(!yon.length||modelP==null)return null;
   const enDusen=yon.reduce((a,b)=>d[b]<d[a]?b:a);
   const favHar=d[fav];
   const ad={'1':'MS 1','X':'Beraberlik','2':'MS 2'};
   if(favHar!=null&&favHar<=-0.4)
-    return {ikon:'💎',tip:'Teyitli',aciklama:`AI favorisi ${ad[fav]} + oranı ${Math.abs(favHar)}% düştü (para o tarafa akıyor)`,pazar:'MS '+fav,puan:Math.round(ai.puan+Math.abs(favHar)*4),renk:'y'};
+    return {ikon:'💎',tip:'Teyitli',aciklama:`AI favorisi ${ad[fav]} + oranı ${Math.abs(favHar)}% düştü (para o tarafa akıyor)`,pazar:'MS '+fav,puan:Math.round(modelP+Math.abs(favHar)*4),renk:'y'};
   if(favHar!=null&&favHar>=1.2)
-    return {ikon:'🟡',tip:'Değer fırsatı',aciklama:`AI favorisi ${ad[fav]} ama oranı ${favHar}% yükseldi — piyasa soğumuş, oran şişmiş olabilir`,pazar:'MS '+fav,puan:Math.round(ai.puan*0.6+favHar*5),renk:''};
+    return {ikon:'🟡',tip:'Değer fırsatı',aciklama:`AI favorisi ${ad[fav]} ama oranı ${favHar}% yükseldi — piyasa soğumuş, oran şişmiş olabilir`,pazar:'MS '+fav,puan:Math.round(modelP*0.6+favHar*5),renk:''};
   if(enDusen!==fav&&d[enDusen]<=-1.2)
     return {ikon:'⚠',tip:'Ters sinyal',aciklama:`AI ${ad[fav]} diyor ama para ${ad[enDusen]} tarafına akıyor (${Math.abs(d[enDusen])}% düşüş) — dikkat`,pazar:'MS '+enDusen,puan:Math.round(Math.abs(d[enDusen])*3),renk:'n'};
   return null;
@@ -2174,7 +2209,7 @@ function bulteniCizNesine(j){
             <td>${m.golAralik?o_(m.golAralik.g01):'—'}</td><td>${m.golAralik?o_(m.golAralik.g23):'—'}</td><td>${m.golAralik?o_(m.golAralik.g45):'—'}</td><td>${m.golAralik?o_(m.golAralik.g6p):'—'}</td>
             <td>${radarMiniHtml(m)}</td>
             <td>${m.ai?pr3(m.ai.p1,m.ai.pX,m.ai.p2):'—'}</td>
-            <td style="font-size:.8rem">${m.ai?`<span class="${puanCls(m.ai.puan)}">●</span> <b>MS ${m.ai.fav}</b> (${pr(m.ai.puan)})${m.ai.pUst25!=null?` · ${m.ai.pUst25>=50?`2.5 Üst (%${m.ai.pUst25})`:`2.5 Alt (%${100-m.ai.pUst25})`}`:''}${m.ai.pKG!=null?` · KG ${m.ai.pKG>=50?'Var':'Yok'} (%${m.ai.pKG>=50?m.ai.pKG:100-m.ai.pKG})`:''}`:'—'}</td>
+            <td style="font-size:.8rem">${m.ai?`<span class="${puanCls(m.modelP)}">●</span> <b>MS ${m.ai.fav}</b> (${pr(m.modelP)})${m.ai.pUst25!=null?` · ${m.ai.pUst25>=50?`2.5 Üst (%${m.ai.pUst25})`:`2.5 Alt (%${100-m.ai.pUst25})`}`:''}${m.ai.pKG!=null?` · KG ${m.ai.pKG>=50?'Var':'Yok'} (%${m.ai.pKG>=50?m.ai.pKG:100-m.ai.pKG})`:''}`:'—'}</td>
             <td style="font-size:.78rem;min-width:210px;max-width:300px">${(()=>{const a=bultenAi[m.c];if(!a)return `<button class="st-mini" style="padding:3px 8px;font-size:.72rem" onclick="bultenAiGetir(${m.c},'${(m.hn||'').replace(/'/g,'’')}','${(m.an||'').replace(/'/g,'’')}','${(l.lig||'').replace(/'/g,'’')}')">🧠 AI skor</button>`;if(a.durum==='yukleniyor')return '<span class="wait">🧠 üretiyor…</span>';if(a.durum==='hata')return '<span class="wait">'+a.yorum+'</span>';return `${a.skor?`🔮 <b class="c-y">MS ${a.skor}</b>`:''}${a.iyskor?` <span class="lig" style="display:inline">İY ${a.iyskor}</span>`:''} ${a.bahis?`<span class="oyn">${a.bahis}${a.p!=null?' %'+a.p:''}</span>`:''}${(a.tuzak||a.favori)?`<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px">${tuzakRozet(a)}${yaklasimRozet(a.favori,a.msOlasilik)}</div>`:''}${skorMarketRozet(a)}${a.yorum?`<div class="lig yorumK" onclick="this.classList.toggle('acik')" title="tıkla: aç/kapa">${a.tur==='kupa'?'<span style="color:var(--amber)">🏆 kupa modu</span> · ':''}${(a.h2h&&!/veri yok/i.test(a.h2h))?`<b style="color:var(--accent)">🔁 H2H:</b> ${a.h2h} · `:''}${a.yorum}</div>`:''}`;})()}</td>
           </tr>`).join('')}
         </tbody>
@@ -3330,7 +3365,7 @@ async function canliYukle(){
             <td class="lig" style="display:table-cell">${o_(m.lig)}</td>
             <td>${o_(m.ms&&m.ms['1'])}</td><td>${o_(m.ms&&m.ms['X'])}</td><td>${o_(m.ms&&m.ms['2'])}</td>
             <td>${m.au?`(${m.au.sov}) ${o_(m.au.alt)} / ${o_(m.au.ust)}`:'—'}</td>
-            <td style="font-size:.78rem">${m.ai?`<span class="${puanCls(m.ai.puan)}">●</span> ${(m.ai.yorum||'').replace('mar j','marj').replace(/2\.5Ü/g,(m.au&&m.au.sov!=null)?m.au.sov+'Ü':'A/Ü').replace(/gol beklentisi|düşük skor profili/g,x=>x+' (canlı çizgi)')}`:'<span class="wait">MS askıda</span>'}</td>
+            <td style="font-size:.78rem">${m.ai?`<span class="${puanCls(m.modelP)}">●</span> ${(m.ai.yorum||'').replace('mar j','marj').replace(/2\.5Ü/g,(m.au&&m.au.sov!=null)?m.au.sov+'Ü':'A/Ü').replace(/gol beklentisi|düşük skor profili/g,x=>x+' (canlı çizgi)')}`:'<span class="wait">MS askıda</span>'}</td>
           </tr>`).join('')}
         </tbody>
       </table></div>`:'<div class="kart">Şu an canlı futbol maçı yok.</div>';
@@ -3361,10 +3396,10 @@ async function optimizeKupon(){
   if(!sonBulten){try{sonBulten=await (await fetch(API+'/gunluk')).json();}catch(e){sonuc.innerHTML='<span class="wait">Bülten alınamadı.</span>';return;}}
   const aday=[];
   (sonBulten.ligler||[]).forEach(l=>(l.maclar||[]).forEach(m=>{
-    if(!m.ai||m.ai.puan==null||m.ai.puan<bant.min||!m.ms)return;
+    if(!m.ai||m.modelP==null||m.modelP<bant.min||!m.ms)return;
     const fav=m.ai.fav; if(fav!=='1'&&fav!=='2')return;
     const oran=m.ms[fav]; if(!oran||oran<bant.lo||oran>bant.hi)return;
-    aday.push({c:m.c,mac:m.hn+' - '+m.an,lig:l.lig,t:m.t,pazar:'MS '+fav,oran,puan:m.ai.puan});
+    aday.push({c:m.c,mac:m.hn+' - '+m.an,lig:l.lig,t:m.t,pazar:'MS '+fav,oran,puan:m.modelP});
   }));
   aday.sort((a,b)=>b.puan-a.puan);
   const secim=[], ligSay={};
